@@ -1,0 +1,14 @@
+#!/bin/sh
+# vim: set filetype=sh :
+set -e
+
+VERSION=1.5.1
+WORKDIR=$(echo $(pwd) | sed "s#$GOPATH#/go#")
+
+docker run --rm -t \
+	--volumes-from=gov${VERSION} \
+	-v ${GOPATH}/src:/go/src \
+	-w ${WORKDIR} \
+	-u $(id -u $(whoami)) \
+	--link=postgres \
+	--entrypoint=go golang:${VERSION} "$@"

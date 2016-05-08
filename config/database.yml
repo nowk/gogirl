@@ -1,0 +1,21 @@
+base: &base
+  adapter: postgresql
+  pool: 5
+  timeout: 5000
+  host: <%= ENV["POSTGRES_PORT_5432_TCP_ADDR"] %>
+  username: postgres
+  password: <%= ENV["POSTGRES_ENV_POSTGRES_PASSWORD"] %>
+
+development:
+  <<: *base
+  database: <%= ENV["DATABASE_NAME"] %>_development
+
+test:
+  <<: *base
+  database: <%= ENV["DATABASE_NAME"] %>_test
+
+prodiction:
+  <<: *base
+  database: <%= ENV["DATABASE_NAME"] %>_production
+  # TODO username
+  # TODO password

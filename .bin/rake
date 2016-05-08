@@ -1,0 +1,5 @@
+#!/bin/sh
+# vim: set filetype=sh :
+set -e
+
+DATABASE_NAME=gogirl ${HOME}/devs/ops/rake-db/.bin/rake "$@"
