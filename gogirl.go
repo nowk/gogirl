@@ -103,8 +103,12 @@ func clone(f interface{}) interface{} {
 	return new.Interface() // return interface on new (the ptr)
 }
 
-// Create returns an assembly for a found factory
-func Create(name string, p interface{}) *assembly {
+type Executor interface {
+	Exec(interface{}) error
+}
+
+// Create returns an Executor for a found factory
+func Create(name string, attrs map[string]interface{}, p interface{}) Executor {
 	f, err := get(name)
 	if err != nil {
 		panic(err)
@@ -116,15 +120,21 @@ func Create(name string, p interface{}) *assembly {
 		assign: assignFunc(p),
 	}
 
-	return a
+	return a.With(attrs)
 }
 
-type Attrs map[string]interface{}
+type (
+	// Attrs, language sugar eg. Create("a_person", Attrs{"Name": "Bobe"}, &p)
+	Attrs map[string]interface{}
+
+	// With, language sugar eg. Create("a_person", With{"Name": "Bobe"}, &p)
+	With map[string]interface{}
+)
 
 // With provides a way to overwrite the original defined factory fields before
 // execution. This will not mutate the original defined factory.
 // Note, Attrs `key`s must match the field name in the underlying struct.
-func (a *assembly) With(attrs Attrs) *assembly {
+func (a *assembly) With(attrs map[string]interface{}) Executor {
 	if attrs == nil {
 		return a
 	}
@@ -166,4 +176,48 @@ func (a *assembly) Exec(store interface{}) error {
 	}
 
 	return a.assign(v)
+}
+
+type AutoExec interface {
+	Create(string, map[string]interface{}, interface{})
+	Err() error
+}
+
+// autoExecutor proides a construct to automatically call Exec when calling
+// Create. Allowing large number of factories to easily execute in sync.
+type autoExecutor struct {
+	store interface{}
+
+	err error
+}
+
+func NewAutoExec(store interface{}) AutoExec {
+	return &autoExecutor{
+		store: store,
+	}
+}
+
+// Create executes a returned Executor. Any errors will be stored and subsequent
+// calls to Create will be skipped
+func (a *autoExecutor) Create(name string, attrs map[string]interface{}, d interface{}) {
+	if a.err != nil {
+		return // if there is an error any further executions
+	}
+
+	var err error
+	func() {
+		defer func() {
+			if e := recover(); e != nil {
+				err = e.(error)
+			}
+		}()
+		err = Create(name, attrs, d).Exec(a.store)
+	}()
+
+	// assign error
+	a.err = err
+}
+
+func (a *autoExecutor) Err() error {
+	return a.err
 }

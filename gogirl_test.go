@@ -159,7 +159,7 @@ func TestCreatesANewRecordBasedOnDefinedFactory(t *testing.T) {
 	)
 
 	var p Person
-	err := Create("a_person", &p).Exec(db)
+	err := Create("a_person", nil, &p).Exec(db)
 	if err != nil {
 		t.Errorf("expected no error, got %s", err)
 	}
@@ -205,10 +205,7 @@ func TestOverwritingAttributesOnDefinedFactory(t *testing.T) {
 	)
 
 	var p Person
-	err := Create("a_person", &p).With(Attrs{
-		"Name": "John",
-		"Age":  1,
-	}).Exec(db)
+	err := Create("a_person", Attrs{"Name": "John", "Age": 1}, &p).Exec(db)
 	if err != nil {
 		t.Errorf("expected no error, got %s", err)
 	}
@@ -246,6 +243,77 @@ func TestOverwritingAttributesOnDefinedFactory(t *testing.T) {
 		)
 		if reflect.DeepEqual(exp, got) {
 			t.Errorf("expected no mutation of %s, got %s", exp, got)
+		}
+	}
+}
+
+func TestExecAutoExecsInSyncMultipleCreates(t *testing.T) {
+	var (
+		clearCtx = newCtx()
+
+		db, trunc = NewDB(t)
+	)
+	defer func() {
+		clearCtx()
+		trunc()
+	}()
+
+	var (
+		f = &Person{
+			Name: "Bob",
+			Age:  15,
+		}
+
+		_ = Define("a_person", f)
+	)
+
+	var (
+		p1 Person
+		p2 Person
+	)
+	exec := NewAutoExec(db)
+	exec.Create("a_person", Attrs{"Name": "Frank"}, &p1)
+	exec.Create("a_person", Attrs{"Name": p1.Name, "Age": 1}, &p2)
+	err := exec.Err()
+	if err != nil {
+		t.Errorf("expected no error, got %s", err)
+	}
+
+	{
+		var d Person
+		if err := findPerson(p1.ID, db, &d); err != nil {
+			t.Fatal(err)
+		}
+		var (
+			exp = Person{
+				ID:   p1.ID,
+				Name: "Frank",
+				Age:  15,
+			}
+
+			got = p1
+		)
+		if !reflect.DeepEqual(exp, got) {
+			t.Errorf("expected %s, got %s", exp, got)
+		}
+	}
+
+	{
+		var d Person
+		if err := findPerson(p2.ID, db, &d); err != nil {
+			t.Fatal(err)
+		}
+		var (
+			exp = Person{
+				ID:   p2.ID,
+				Name: "Frank",
+				Age:  1,
+			}
+
+			got = p2
+		)
+		if !reflect.DeepEqual(exp, got) {
+			t.Errorf("expected %s, got %s", exp, got)
 		}
 	}
 }
