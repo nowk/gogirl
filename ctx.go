@@ -22,7 +22,7 @@ func set(k string, f interface{}) error {
 func get(k string) (interface{}, error) {
 	f, ok := ctx[k]
 	if !ok {
-		return nil, fmt.Errorf("Definition not found: %s", k)
+		return nil, fmt.Errorf("Factory not found: %s", k)
 	}
 
 	return f, nil
